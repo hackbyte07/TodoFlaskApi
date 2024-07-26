@@ -1,47 +1,45 @@
-from flask import Flask, jsonify, render_template,  render_template_string, request
-
-
+from flask import Flask, render_template, request, redirect, url_for
+from database import db
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
 
-@app.get('/add')
-def add():
-    return {'name': 'aayush', 'data': {'data': [1, 2, 3]}}
+from models import Task
 
-@app.get('/')
+@app.route('/')
 def index():
-    return  render_template_string('<h1>welcome to flask 🌶️</h1>')
+    tasks = Task.query.all()
+    return render_template('index.html', tasks=tasks)
 
-@app.post('/name/<int:name>')
-def postThis():
-    return 'This is a post request'
+@app.route('/add', methods=['GET', 'POST'])
+def add_task():
+    if request.method == 'POST':
+        task_name = request.form['name']
+        new_task = Task(name=task_name)
+        db.session.add(new_task)
+        db.session.commit()
+        return redirect(url_for('index'))
+    return render_template('add_task.html')
 
-@app.patch('/patch')
-def patchThis():
-    return 'This is a patch request'
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+def edit_task(id):
+    task = Task.query.get_or_404(id)
+    if request.method == 'POST':
+        task.name = request.form['name']
+        db.session.commit()
+        return redirect(url_for('index'))
+    return render_template('edit_task.html', task=task)
 
-@app.delete('/delete')
-def deleteThis():
-    return 'The post is deleted.'
-
-@app.get('/template')
-def show_template():
-    return render_template('index.html', listValue = [0, 2, 4, 7, 8])
-
-
-@app.route('/home') 
-def home():       
-        data = "hello world"
-        return jsonify({'data': data}) 
-  
-
-@app.route('/home/<int:num>', methods = ['GET']) 
-def disp(num): 
-  
-    return jsonify({'data': num**2}) 
+@app.route('/delete/<int:id>')
+def delete_task(id):
+    task = Task.query.get_or_404(id)
+    db.session.delete(task)
+    db.session.commit()
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
-    app.logger.debug('logging the application')
-
-
